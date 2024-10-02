@@ -50,7 +50,9 @@ function read_train_forces_together(tin)
 
                     if train_forces_struc
                         # Check if F < Fmax
-                        F_max_struc = maximum(abs.(forces))
+                        #print(forces)
+                        F_max_struc = map(x -> maximum(abs.(x)), forces)
+                        #F_max_struc = maximum(maximum(abs.(forces)))
                         if max_forces == nothing || F_max_struc < max_forces
                             push!(list_struct_forces, Structure(name, species, descriptors, E, E_atomic_structure, sys_species,
                                 coords, forces, input_size, train_forces_struc,

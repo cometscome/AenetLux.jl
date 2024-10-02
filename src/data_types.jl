@@ -146,43 +146,91 @@ mutable struct Structure
     energy::Float64
     E_atomic_structure::Float64
     train_forces::Bool
+    N_species::Int64
     N_ions::Vector{Int64}
     N_atom::Int64
     species::Vector{Int64}
-    descriptor::Vector{Vector{Any}}
-    forces::Any
-    coords::Any
-    max_nb_struc::Int64
-    list_nblist::Any
-    list_sfderiv_i::Any
-    list_sfderiv_j::Any
-    device::String
-    order::Any
+    descriptor::Vector{Vector{Vector{Float64}}}
+    forces::Vector{Vector{Float64}}
+    coords::Vector{Vector{Float64}}
+    max_nb_struc::Union{Nothing,Int64}
+    list_nblist::Union{Nothing,Vector{Vector{Int64}}}
+    list_sfderiv_i::Union{Nothing,Vector{Array{Float64,3}}}
+    list_sfderiv_j::Union{Nothing,Vector{Array{Float64,4}}}
+    order::Union{Nothing,Array{Int64}}
+
+
 end
 
-function Structure(name::String, species::Vector{Int}, descriptor::Matrix{Float64}, energy::Float64, energy_atom_struc::Float64,
-    sys_species::Vector{String}, coords::Matrix{Float64}, forces::Matrix{Float64}, input_size::Vector{Int},
-    train_forces::Bool=false, list_nblist=nothing, list_sfderiv_i=nothing, list_sfderiv_j=nothing)
+function Structure(name, species, descriptor, energy,
+    energy_atom_struc, sys_species, coords,
+    forces, input_size, train_forces=false,
+    list_nblist=nothing, list_sfderiv_i=nothing, list_sfderiv_j=nothing)
+
     N_species = length(sys_species)
     N_ions = fill(0, N_species)
 
     for iesp in species
-        N_ions[iesp] += 1
+        N_ions[iesp+1] += 1
     end
 
     N_atom = sum(N_ions)
-    descriptor_data = [zeros(input_size[i]) for i in 1:N_species]
-    forces_tensor = zeros(N_atom)
-    coords_tensor = zeros(N_atom)
+    #descriptor_data = [Vector{Vector{Float64}}(undef, N_ions[iesp]) for iesp in 1:N_species]
+    descriptor_data = [[Float64[] for iat in 1:N_ions[iesp]] for iesp in 1:N_species]
+    println(typeof(descriptor_data))
+    #descriptor_data = [zeros(input_size[i]) for i in 1:N_species]
+    forces_tensor = [zeros(3) for iesp in 1:N_atom]#zeros(N_atom)
+    coords_tensor = [zeros(3) for iesp in 1:N_atom]#zeros(N_atom)
 
-    for i in 1:length(species)
-        descriptor_data[species[i]] = descriptor[i, :]
-        forces_tensor[i] = forces[i, :]
-        coords_tensor[i] = coords[i, :]
+    cont_iesp = fill(0, N_species)
+    cont = 1
+    for iesp in 1:N_species
+        for iat in 1:N_atom
+            if species[iat] == iesp - 1
+                #println(descriptor[iat])
+                #println(descriptor_data[iesp][cont_iesp[iesp]+1])
+                #println(typeof(descriptor[iat]))
+                #println(typeof(descriptor_data[iesp][cont_iesp[iesp]+1]))
+                descriptor_data[iesp][cont_iesp[iesp]+1] = descriptor[iat]
+                #push!(descriptor_data[iesp], descriptor[iat])
+                forces_tensor[cont] = forces[iat]
+                coords_tensor[cont] = coords[iat]
+                cont_iesp[iesp] += 1
+                cont += 1
+            end
+        end
     end
+    self = Structure(name, energy, energy_atom_struc, train_forces, N_species, N_ions, N_atom, species, descriptor_data, forces_tensor, coords_tensor, nothing, nothing, nothing, nothing, nothing)
 
-    return Structure(name, energy, energy_atom_struc, train_forces, N_ions, N_atom, species, descriptor_data, forces_tensor, coords_tensor,
-        0, list_nblist, list_sfderiv_i, list_sfderiv_j, "cpu", nothing)
+    if train_forces
+
+        self.max_nb_struc = maximum([length(x) for x in list_nblist])
+
+        self.order = fill(0, self.N_atom)
+        self.list_nblist = [Vector{Int}[] for iesp in 1:self.N_species]
+        self.list_sfderiv_i = [zeros(self.N_ions[iesp], input_size[iesp], 3) for iesp in 1:self.N_species]
+        self.list_sfderiv_j = [zeros(self.N_ions[iesp], self.max_nb_struc, input_size[iesp], 3) for iesp in 1:self.N_species]
+
+        cont_iesp = fill(0, self.N_species)
+        cont = 0
+
+        for iesp in 1:self.N_species
+            for iat in 1:self.N_atom
+                if species[iat] == iesp - 1
+                    nnb = length(list_nblist[iat])
+                    self.list_sfderiv_i[iesp][cont_iesp[iesp]+1, :, :] = list_sfderiv_i[iat]
+                    self.list_sfderiv_j[iesp][cont_iesp[iesp]+1, 1:nnb, :, :] = list_sfderiv_j[iat]
+                    push!(self.list_nblist[iesp], list_nblist[iat])
+                    self.order[iat] = cont
+
+                    cont_iesp[iesp] += 1
+                    cont += 1
+                end
+            end
+        end
+    end
+    return self
+
 end
 
 function padding!(structure::Structure, max_nnb::Int, input_size::Vector{Int})
@@ -201,7 +249,7 @@ function padding!(structure::Structure, max_nnb::Int, input_size::Vector{Int})
         for iesp in 1:structure.N_species
             if structure.N_ions[iesp] == 0
                 structure.list_sfderiv_i[iesp] = zeros(structure.N_ions[iesp], input_size[iesp], 3)
-                structure.list_sfderiv_j[iesp] = zeros(structure.N_ions[iesp], structure.max_nb_struc, input_size[iesp], 3)
+                structure.list_sfderiv_j[iesp] = zeros(structure.N_ions[iesp], max_nnb, input_size[iesp], 3)
             end
         end
 

@@ -108,7 +108,7 @@ function tf_read_footer(tf::IO, N_species::Int, species_index)
     return natomstot, E_avg, E_min, E_max, setup_params, input_size
 end
 
-function tff_read_integer(tff::IO, N::Int)
+function tff_read_integer(tff::IO, N)
     pad = read(tff, Int32)  # read the length of the record
     println(pad)
     result = []
@@ -127,7 +127,11 @@ end
 
 function tff_read_real8(tff::IO, N::Int)
     pad = read(tff, Int32)  # read the length of the record
-    result = read(tff, Float64, N)
+    result = []
+    for i = 1:N
+        push!(result, read(tff, Float64))
+    end
+    #result = read(tff, Float64, N)
     pad = read(tff, Int32)  # read the length of the record
 
     if N == 1
@@ -139,16 +143,20 @@ end
 
 function tff_read_character(tff::IO, N)
     pad = read(tff, Int32)  # read the length of the record
-    result = []
+    result = UInt8[]
     for i = 1:N
         tmp = read(tff, UInt8)
-        println(parse(String, tmp))
-        #push!(result, String(tmp))
+        #println(parse(String, tmp))
+        push!(result, tmp)
         #result = String(read(tff, UInt8, N))
     end
+    #println("N = $N")
+    #println(result)
+    #println(String(result))
+    result_st = String(result)
     pad = read(tff, Int32)  # read the length of the record
 
-    return result
+    return result_st
 end
 
 function tff_read_header(tff::IO)
@@ -164,7 +172,7 @@ function tff_read_struc_info_grads(tff::IO, species_index, max_nnb)
     length = tff_read_integer(tff, 1)
     name = tff_read_character(tff, length)
     N_at, N_sp = tff_read_integer(tff, 2)
-    train_forces_struc = tff_read_integer(tff, 1)
+    train_forces_struc = Bool(tff_read_integer(tff, 1))
 
     if train_forces_struc == 1
         for iatom in 1:N_at
@@ -185,8 +193,8 @@ function tff_read_struc_info_grads(tff::IO, species_index, max_nnb)
             push!(list_sfderiv_i, sfderiv_i)
             push!(list_sfderiv_j, sfderiv_j)
 
-            index = species_index[specie]
-            max_nnb[index] = max(max_nnb[index], nnb)
+            index = species_index[specie+1]
+            max_nnb[index+1] = max(max_nnb[index+1], nnb)
         end
 
         return train_forces_struc, max_nnb, list_nblist, list_sfderiv_i, list_sfderiv_j
