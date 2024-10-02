@@ -3,6 +3,11 @@ uuid = "1feff914-a95a-4f57-9ff7-27e1bbfebe76"
 authors = ["Yuki Nagai <cometscome@gmail.com>"]
 version = "1.0.0-DEV"
 
+[deps]
+BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
 [compat]
 julia = "1.6.7"
 
