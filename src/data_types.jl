@@ -1,5 +1,45 @@
 using Random
 
+mutable struct TrainSetParameter
+    filename::String
+    normalized::Bool
+    E_scaling::Float64
+    E_shift::Float64
+    N_species::Int64
+    sys_species::Vector{String}
+    E_atomic::Vector{Float64}
+    N_atom::Int64
+    N_struc::Int64
+    E_min::Float64
+    E_max::Float64
+    E_avg::Float64
+    E_min_norm::Float64
+    E_max_norm::Float64
+    E_avg_norm::Float64
+end
+
+mutable struct FPSetupParameter
+    N_species::Int64
+    description::Vector{String}
+    atomtype::Vector{String}
+    nenv::Vector{Int64}
+    envtypes::Vector{Vector{String}}
+    rcmin::Vector{Float64}
+    rcmax::Vector{Float64}
+    sftype::Vector{String}
+    nsfparam::Vector{Int64}
+    nsf::Vector{Int64}
+    sf::Vector{Vector{Float64}}
+    sfparam::Vector{Vector{Float64}}
+    sfenv::Vector{Vector{Float64}}
+    neval::Vector{Int64}
+    sfval_min::Vector{Vector{Float64}}
+    sfval_max::Vector{Vector{Float64}}
+    sfval_avg::Vector{Vector{Float64}}
+    sfval_cov::Vector{Vector{Float64}}
+end
+
+
 mutable struct InputParameters
     train_file::String
     numpy_seed::Int64
@@ -29,11 +69,13 @@ mutable struct InputParameters
     train_forces_file::String
     networks_param::Dict{String,Any}
     regularization::Union{Nothing,Float64}
+    trainset_params::Union{Nothing,TrainSetParameter}
+    setup_params::Union{Nothing,FPSetupParameter}
 end
 
 function InputParameters()
     return InputParameters("", 11, 22, 1, 256, "train", nothing, nothing, false, false, false, "cpu", 0.0, false, false, false,
-        0.0, 0, "", 0.0, 0, String[], Dict(), Dict(), 0, "", Dict(), nothing)
+        0.0, 0, "", 0.0, 0, String[], Dict(), Dict(), 0, "", Dict(), nothing, nothing, nothing)
 end
 
 function initialize!(params::InputParameters)
@@ -50,26 +92,7 @@ function initialize!(params::InputParameters)
     end
 end
 
-mutable struct FPSetupParameter
-    N_species::Int64
-    description::Vector{String}
-    atomtype::Vector{String}
-    nenv::Vector{Int64}
-    envtypes::Vector{Vector{String}}
-    rcmin::Vector{Float64}
-    rcmax::Vector{Float64}
-    sftype::Vector{String}
-    nsfparam::Vector{Int64}
-    nsf::Vector{Int64}
-    sf::Vector{Vector{Float64}}
-    sfparam::Vector{Vector{Float64}}
-    sfenv::Vector{Vector{Float64}}
-    neval::Vector{Int64}
-    sfval_min::Vector{Vector{Float64}}
-    sfval_max::Vector{Vector{Float64}}
-    sfval_avg::Vector{Vector{Float64}}
-    sfval_cov::Vector{Vector{Float64}}
-end
+
 
 function FPSetupParameter(N_species::Int)
     return FPSetupParameter(N_species,
@@ -105,34 +128,23 @@ function add_specie!(params::FPSetupParameter, iesp_0, description, atomtype, ne
     params.sfval_cov[iesp] = sfval_cov
 end
 
-mutable struct TrainSetParameter
-    filename::String
-    normalized::Bool
-    E_scaling::Float64
-    E_shift::Float64
-    N_species::Int64
-    sys_species::Vector{String}
-    E_atomic::Vector{Float64}
-    N_atom::Int64
-    N_struc::Int64
-    E_min::Float64
-    E_max::Float64
-    E_avg::Float64
+
+function TrainSetParameter(filename, normalized,
+    E_scaling, E_shift, N_species,
+    sys_species, E_atomic, N_atom,
+    N_struc, E_min,
+    E_max, E_avg)
+    return TrainSetParameter(filename, normalized, E_scaling, E_shift, N_species, sys_species, E_atomic, N_atom, N_struc, E_min, E_max, E_avg, 0, 0, 0)
 end
 
-#function TrainSetParameter(filename::String, normalized::Bool, E_scaling::Float64, E_shift::Float64, N_species::Int,
-#    sys_species::Vector{String}, E_atomic::Vector{Float64}, N_atom::Int, N_struc::Int, E_min::Float64,
-#    E_max::Float64, E_avg::Float64)
-#    return TrainSetParameter(filename, normalized, E_scaling, E_shift, N_species, sys_species, E_atomic, N_atom, N_struc, E_min, E_max, E_avg)
-#end
-
 function get_E_normalization!(trainset::TrainSetParameter)
+
     E_scaling = 2 / (trainset.E_max - trainset.E_min)
     E_shift = 0.5 * (trainset.E_max + trainset.E_min)
 
-    trainset.E_min = (trainset.E_min - E_shift) * E_scaling
-    trainset.E_max = (trainset.E_max - E_shift) * E_scaling
-    trainset.E_avg = (trainset.E_avg - E_shift) * E_scaling
+    trainset.E_min_norm = (trainset.E_min - E_shift) * E_scaling
+    trainset.E_max_norm = (trainset.E_max - E_shift) * E_scaling
+    trainset.E_avg_norm = (trainset.E_avg - E_shift) * E_scaling
 
     trainset.E_scaling = E_scaling
     trainset.E_shift = E_shift
@@ -154,7 +166,7 @@ mutable struct Structure
     forces::Vector{Vector{Float64}}
     coords::Vector{Vector{Float64}}
     max_nb_struc::Union{Nothing,Int64}
-    list_nblist::Union{Nothing,Vector{Vector{Int64}}}
+    list_nblist::Union{Nothing,Vector{Vector{Vector{Int64}}}}
     list_sfderiv_i::Union{Nothing,Vector{Array{Float64,3}}}
     list_sfderiv_j::Union{Nothing,Vector{Array{Float64,4}}}
     order::Union{Nothing,Array{Int64}}
@@ -177,7 +189,7 @@ function Structure(name, species, descriptor, energy,
     N_atom = sum(N_ions)
     #descriptor_data = [Vector{Vector{Float64}}(undef, N_ions[iesp]) for iesp in 1:N_species]
     descriptor_data = [[Float64[] for iat in 1:N_ions[iesp]] for iesp in 1:N_species]
-    println(typeof(descriptor_data))
+    #println(typeof(descriptor_data))
     #descriptor_data = [zeros(input_size[i]) for i in 1:N_species]
     forces_tensor = [zeros(3) for iesp in 1:N_atom]#zeros(N_atom)
     coords_tensor = [zeros(3) for iesp in 1:N_atom]#zeros(N_atom)
@@ -207,7 +219,10 @@ function Structure(name, species, descriptor, energy,
         self.max_nb_struc = maximum([length(x) for x in list_nblist])
 
         self.order = fill(0, self.N_atom)
-        self.list_nblist = [Vector{Int}[] for iesp in 1:self.N_species]
+        self.list_nblist = [Vector{Vector{Int64}}(undef, 0) for iesp in 1:self.N_species]
+        #self.list_nblist = [Vector{Vector{Int64}}(undef, 0) for iesp in 1:self.N_species]
+        #error(typeof(self.list_nblist))
+        #self.list_nblist = [[Int64[] for iat in 1:N_ions[iesp]] for iesp in 1:N_species]
         self.list_sfderiv_i = [zeros(self.N_ions[iesp], input_size[iesp], 3) for iesp in 1:self.N_species]
         self.list_sfderiv_j = [zeros(self.N_ions[iesp], self.max_nb_struc, input_size[iesp], 3) for iesp in 1:self.N_species]
 
@@ -220,13 +235,21 @@ function Structure(name, species, descriptor, energy,
                     nnb = length(list_nblist[iat])
                     self.list_sfderiv_i[iesp][cont_iesp[iesp]+1, :, :] = list_sfderiv_i[iat]
                     self.list_sfderiv_j[iesp][cont_iesp[iesp]+1, 1:nnb, :, :] = list_sfderiv_j[iat]
-                    push!(self.list_nblist[iesp], list_nblist[iat])
+                    #println(list_nblist[iat])
+                    #println(typeof(list_nblist[iat]))
+                    #println(self.list_nblist[iesp])
+                    #println("t ", typeof(self.list_nblist[iesp]))
+                    #println(list_nblist[iat])
+                    #println(self.list_nblist[iesp])
+                    push!(self.list_nblist[iesp], list_nblist[iat]) #
+                    #println(self.list_nblist[iesp])
                     self.order[iat] = cont
 
                     cont_iesp[iesp] += 1
                     cont += 1
                 end
             end
+            #error("w")
         end
     end
     return self
@@ -253,14 +276,25 @@ function padding!(structure::Structure, max_nnb::Int, input_size::Vector{Int})
             end
         end
 
-        aux_nblist = [fill(-1000000000, structure.N_ions[iesp], max_nnb) for iesp in 1:structure.N_species]
+        aux_nblist = [[fill(-1000000000, max_nnb) for k = 1:structure.N_ions[iesp]] for iesp in 1:structure.N_species]
+        #aux_nblist = [fill(-1000000000, structure.N_ions[iesp], max_nnb) for iesp in 1:structure.N_species]
         aux_sfderiv_j = [zeros(structure.N_ions[iesp], max_nnb, input_size[iesp], 3) for iesp in 1:structure.N_species]
 
         for iesp in 1:structure.N_species
             for iat in 1:structure.N_ions[iesp]
                 nnb = length(structure.list_nblist[iesp][iat])
-                aux_nblist[iesp][iat, 1:nnb] = structure.list_nblist[iesp][iat] .- 1
-                aux_sfderiv_j[iesp][iat, 1:nnb, :, :] = structure.list_sfderiv_j[iesp][iat][1:nnb, :, :]
+                #println("dd ", structure.list_nblist[iesp][iat])
+                #aux_nblist[iesp][iat, 1:nnb] = structure.list_nblist[iesp][iat] .- 1
+                aux_nblist[iesp][iat][1:nnb] = structure.list_nblist[iesp][iat] .- 1
+                #println("iesp,iat $iesp ", iat)
+                #println(typeof(iat))
+                #println([iat, 1:nnb, :, :])
+                #println(typeof(aux_sfderiv_j[iesp]))
+                #println(size(aux_sfderiv_j[iesp]))
+                #println(size(structure.list_sfderiv_j[iesp]))
+                #println(aux_sfderiv_j[iesp][iat, 1:nnb, :, :])
+                #println(size(structure.list_sfderiv_j[iesp][iat][1:nnb, :, :]))
+                aux_sfderiv_j[iesp][iat, 1:nnb, :, :] = structure.list_sfderiv_j[iesp][iat, 1:nnb, :, :]
             end
         end
 
@@ -269,11 +303,14 @@ function padding!(structure::Structure, max_nnb::Int, input_size::Vector{Int})
         for iat in 1:N_atom_total
             if structure.order[iat] != iat
                 for iesp in 1:structure.N_species
-                    sorted_nblist[iesp] = ifelse(aux_nblist[iesp] .== iat, structure.order[iat], sorted_nblist[iesp])
+                    sorted_nblist[iesp] = ifelse.(aux_nblist[iesp] .== iat, structure.order[iat], sorted_nblist[iesp])
                 end
             end
         end
 
+        #println(typeof(sorted_nblist))
+        #println(typeof(structure.list_nblist))
+        #println(sorted_nblist)
         structure.list_nblist = sorted_nblist
         structure.list_sfderiv_j = aux_sfderiv_j
     end

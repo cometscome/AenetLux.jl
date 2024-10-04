@@ -1,4 +1,5 @@
 module AenetLux
+include("py_aeio.jl")
 include("data_types.jl")
 include("read_forces_bin.jl")
 include("read_input.jl")

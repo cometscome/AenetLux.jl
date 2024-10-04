@@ -110,7 +110,7 @@ end
 
 function tff_read_integer(tff::IO, N)
     pad = read(tff, Int32)  # read the length of the record
-    println(pad)
+    #println(pad)
     result = []
     for i = 1:N
         push!(result, read(tff, Int32))

@@ -44,9 +44,10 @@ function read_train_forces_together(tin)
                 if max_energy != nothing && E_per_atom > max_energy
                     push!(list_removed, name)
                 else
-                    E_max_min_avg[1] = min(E_max_min_avg[1], E_per_atom)
-                    E_max_min_avg[2] += E_per_atom
                     E_max_min_avg[1] = max(E_max_min_avg[1], E_per_atom)
+                    E_max_min_avg[2] = min(E_max_min_avg[2], E_per_atom)
+                    E_max_min_avg[3] += E_per_atom
+
 
                     if train_forces_struc
                         # Check if F < Fmax
@@ -69,10 +70,10 @@ function read_train_forces_together(tin)
                 end
             end
 
-            # Recompute E_scaling and E_shift if some structures have been excluded
+            # Recompute E_scfaling and E_shift if some structures have been excluded
             trainset_params.E_max = E_max_min_avg[1]
             trainset_params.E_min = E_max_min_avg[2]
-            trainset_params.E_avg = E_max_min_avg[2] / (length(list_struct_forces) + length(list_struct_energy))
+            trainset_params.E_avg = E_max_min_avg[3] / (length(list_struct_forces) + length(list_struct_energy))
             get_E_normalization!(trainset_params)
 
             max_nnb = maximum(max_nnb)
@@ -121,9 +122,10 @@ function read_train(tin)
             if max_energy != nothing && E_per_atom > max_energy
                 push!(list_removed, name)
             else
-                E_max_min_avg[1] = min(E_max_min_avg[1], E_per_atom)
-                E_max_min_avg[2] += E_per_atom
                 E_max_min_avg[1] = max(E_max_min_avg[1], E_per_atom)
+                E_max_min_avg[2] = min(E_max_min_avg[2], E_per_atom)
+                E_max_min_avg[3] += E_per_atom
+
 
                 push!(list_struct_energy, Structure(name, species, descriptors, E, E_atomic_structure, sys_species, coords, forces, input_size))
             end
@@ -132,7 +134,7 @@ function read_train(tin)
         # Recompute E_scaling and E_shift if some structures have been excluded
         trainset_params.E_max = E_max_min_avg[1]
         trainset_params.E_min = E_max_min_avg[2]
-        trainset_params.E_avg = E_max_min_avg[2] / (length(list_struct_energy))
+        trainset_params.E_avg = E_max_min_avg[3] / (length(list_struct_energy))
         get_E_normalization!(trainset_params)
 
         max_nnb = maximum(max_nnb)
