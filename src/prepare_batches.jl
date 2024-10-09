@@ -63,6 +63,11 @@ function select_batch_size(tin, list_structures_energy, list_structures_forces)
     train_sampler_E, valid_sampler_E = split_database(N_data_E, tin.test_split)
     train_sampler_F, valid_sampler_F = split_database(N_data_F, tin.test_split)
 
+    N_data_train_E = length(train_sampler_E)
+    N_data_valid_E = length(valid_sampler_E)
+    N_data_train_F = length(train_sampler_F)
+    N_data_valid_F = length(valid_sampler_F)
+
     forcespercent = N_data_F / (N_data_F + N_data_E)
 
     if forcespercent <= 0.5
@@ -107,9 +112,20 @@ function select_batches(tin, trainset_params, device, list_structures_energy, li
         # Split in train/test
         train_sampler_E, valid_sampler_E = split_database(dataset_energy_size, tin.test_split)
 
-        train_energy_data = PrepDataloader(dataset=dataset_energy, train_forces=false, N_batch=N_batch_train,
-            sampler=train_sampler_E, memory_mode=tin.memory_mode, device=device, dataname="train_energy")
-        valid_energy_data = PrepDataloader(dataset=dataset_energy, train_forces=false, N_batch=N_batch_valid,
+        #println(typeof(dataset_energy))
+        #error("d")
+        # PrepDataloader(dataset, train_forces=false, batch_size=1, N_batch=1,
+        #sampler=nothing, memory_mode="cpu", device="cpu",
+        #dataname::String="", generate::Bool=true)#
+
+        train_energy_data = PrepDataloader(dataset_energy,
+            train_forces=false,
+            N_batch=N_batch_train,
+            sampler=train_sampler_E,
+            memory_mode=tin.memory_mode,
+            device=device,
+            dataname="train_energy")
+        valid_energy_data = PrepDataloader(dataset_energy, train_forces=false, N_batch=N_batch_valid,
             sampler=valid_sampler_E, memory_mode=tin.memory_mode, device=device, dataname="valid_energy")
     else
         dataset_energy = nothing
@@ -128,9 +144,9 @@ function select_batches(tin, trainset_params, device, list_structures_energy, li
         # Split in train/test
         train_sampler_F, valid_sampler_F = split_database(dataset_forces_size, tin.test_split)
 
-        train_forces_data = PrepDataloader(dataset=dataset_forces, train_forces=true, N_batch=N_batch_train,
+        train_forces_data = PrepDataloader(dataset_forces, train_forces=true, N_batch=N_batch_train,
             sampler=train_sampler_F, memory_mode=tin.memory_mode, device=device, dataname="train_forces")
-        valid_forces_data = PrepDataloader(dataset=dataset_forces, train_forces=true, N_batch=N_batch_valid,
+        valid_forces_data = PrepDataloader(dataset_forces, train_forces=true, N_batch=N_batch_valid,
             sampler=valid_sampler_F, memory_mode=tin.memory_mode, device=device, dataname="valid_forces")
     else
         dataset_forces = nothing

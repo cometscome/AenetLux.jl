@@ -33,8 +33,8 @@ function read_train_forces_together(tin)
                 natomstot, N_struc, E_min, E_max, E_avg)
 
             # Structures in dataset
-            list_struct_forces = []
-            list_struct_energy = []
+            list_struct_forces = Structure[]
+            list_struct_energy = Structure[]
             max_nnb = fill(0, length(species_index))
             for istruc in 1:N_struc
                 name, E, E_atomic_structure, species, coords, forces, descriptors = tf_read_struc_info(tf, species_index, E_atomic)

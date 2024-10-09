@@ -1,6 +1,7 @@
 using Dates
 using Printf
 using Random
+using Statistics
 
 function io_print(text)
     println(text)
@@ -102,6 +103,7 @@ function io_network_initialize(tin)
         for ilayer in 1:length(tin.networks_param["hidden_size"][iesp])
             io_print("   $(ilayer + 1) : $(tin.networks_param["hidden_size"][iesp][ilayer])   $(tin.networks_param["activations"][iesp][ilayer])")
         end
+        ilayer = length(tin.networks_param["hidden_size"][iesp])
         io_print("   $(ilayer + 2) : 1")
         io_print("")
     end
@@ -154,11 +156,14 @@ function io_prepare_batches_done(tin, train_energy_data, train_forces_data)
     mean_batch_size_F = 0
 
     if train_energy_data != nothing
+        #display(train_energy_data.indexes)
         aux = train_energy_data.indexes[:, 2] - train_energy_data.indexes[:, 1]
+        #display(aux)
         mean_batch_size_E = round(mean(aux))
     end
 
     if train_forces_data != nothing
+
         aux = train_forces_data.indexes[:, 2] - train_forces_data.indexes[:, 1]
         mean_batch_size_F = round(mean(aux))
     end

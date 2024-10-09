@@ -162,7 +162,8 @@ mutable struct Structure
     N_ions::Vector{Int64}
     N_atom::Int64
     species::Vector{Int64}
-    descriptor::Vector{Vector{Vector{Float64}}}
+    descriptor::Vector{Matrix{Float64}}
+    #descriptor::Vector{Vector{Vector{Float64}}}
     forces::Vector{Vector{Float64}}
     coords::Vector{Vector{Float64}}
     max_nb_struc::Union{Nothing,Int64}
@@ -188,7 +189,9 @@ function Structure(name, species, descriptor, energy,
 
     N_atom = sum(N_ions)
     #descriptor_data = [Vector{Vector{Float64}}(undef, N_ions[iesp]) for iesp in 1:N_species]
-    descriptor_data = [[Float64[] for iat in 1:N_ions[iesp]] for iesp in 1:N_species]
+    descriptor_data = Matrix{Float64}[zeros(1, 1) for iesp in 1:N_species]
+    #descriptor_data = [[Float64[] for iat in 1:N_ions[iesp]] for iesp in 1:N_species]
+
     #println(typeof(descriptor_data))
     #descriptor_data = [zeros(input_size[i]) for i in 1:N_species]
     forces_tensor = [zeros(3) for iesp in 1:N_atom]#zeros(N_atom)
@@ -197,13 +200,15 @@ function Structure(name, species, descriptor, energy,
     cont_iesp = fill(0, N_species)
     cont = 1
     for iesp in 1:N_species
+        descriptor_data_tmp = [Float64[] for iat in 1:N_ions[iesp]]
         for iat in 1:N_atom
             if species[iat] == iesp - 1
                 #println(descriptor[iat])
                 #println(descriptor_data[iesp][cont_iesp[iesp]+1])
                 #println(typeof(descriptor[iat]))
                 #println(typeof(descriptor_data[iesp][cont_iesp[iesp]+1]))
-                descriptor_data[iesp][cont_iesp[iesp]+1] = descriptor[iat]
+                descriptor_data_tmp[cont_iesp[iesp]+1] = descriptor[iat]
+                #descriptor_data[iesp][cont_iesp[iesp]+1] = descriptor[iat]
                 #push!(descriptor_data[iesp], descriptor[iat])
                 forces_tensor[cont] = forces[iat]
                 coords_tensor[cont] = coords[iat]
@@ -211,6 +216,7 @@ function Structure(name, species, descriptor, energy,
                 cont += 1
             end
         end
+        descriptor_data[iesp] = vcat(transpose(descriptor_data_tmp)...)
     end
     self = Structure(name, energy, energy_atom_struc, train_forces, N_species, N_ions, N_atom, species, descriptor_data, forces_tensor, coords_tensor, nothing, nothing, nothing, nothing, nothing)
 
